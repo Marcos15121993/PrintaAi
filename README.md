@@ -12,7 +12,8 @@ Programa em Python para capturar a tela no Windows, no estilo Lightshot: ao aper
 - **Salvar** em PNG, JPG ou BMP, ou **copiar** para a área de transferência e colar (Ctrl+V) em WhatsApp, Discord, Teams, e-mail etc.
 - Suporte a vários monitores e a telas com escala de DPI (125%, 150%...).
 
-![Pré-visualização da interface](preview.png)
+![Pré-visualização da interface](<img width="1280" height="720" alt="image" src="https://github.com/user-attachments/assets/7697704b-3706-49df-902c-8818367cc913" />
+)
 
 ## Requisitos
 
