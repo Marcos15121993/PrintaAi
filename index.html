@@ -41,7 +41,7 @@ kbd { font: 500 .82em var(--mono); background: var(--key-bg); border: 1px solid 
 /* top bar */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 20px; }
 .brand { display: flex; align-items: center; gap: 10px; font: 700 20px var(--display); }
-.brand svg { width: 26px; height: 26px; }
+.brand svg { width: 30px; height: 30px; flex: none; }
 .top nav { display: flex; gap: 20px; font-size: 15px; color: var(--muted); }
 .top nav a { text-decoration: none; }
 .top nav a:hover { color: var(--fg); }
@@ -140,9 +140,13 @@ footer { padding-block: 28px 40px; color: var(--muted); font-size: 14px; border-
 <div class="wrap">
   <header class="top">
     <div class="brand">
-      <svg viewBox="0 0 26 26" fill="none" aria-hidden="true">
-        <path d="M2 8V2h6M18 2h6v6M24 18v6h-6M8 24H2v-6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M8 17l9-9m0 0h-6m6 0v6" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect width="24" height="24" rx="6" fill="#1677ff"/>
+        <g transform="translate(3.6 3.6) scale(0.7)" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round">
+          <rect x="2.6" y="5" width="18.8" height="14.6" rx="4.2"/>
+          <circle cx="12" cy="12.3" r="3.6"/>
+          <circle cx="6.7" cy="8.6" r="1" fill="#fff" stroke="none"/>
+        </g>
       </svg>
       PrintaAi
     </div>
@@ -288,6 +292,8 @@ footer { padding-block: 28px 40px; color: var(--muted); font-size: 14px; border-
   const DOWNLOAD = REPO + "/raw/main/Instalar_PrintaAi.exe";
   document.querySelectorAll(".js-download").forEach(a => a.href = DOWNLOAD);
   document.querySelectorAll(".js-repo").forEach(a => a.href = REPO);
+
 </script>
+
 </body>
 </html>
