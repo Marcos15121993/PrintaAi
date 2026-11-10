@@ -1,13 +1,29 @@
 #!/usr/bin/env python3
 r"""
-PrintaAí — captura de tela estilo Lightshot
-============================================
 
-
+# =============================================================================
+# PROJETO:       PrintaAí 
+# DESCRIÇÃO:     Ferramenta de captura de tela (Screenshot)
+#                Inspirada no conceito do Lightshot.
+#
+# DESENVOLVEDOR: Marcos Barros
+# LINGUAGEM:     Python
+# VERSÃO:        1.2.1
+# DATA:          10/11/2026
+#
+# FUNCIONALIDADES:
+#   - Captura de regiões específicas da tela
+#   - Seleção e edição de imagens
+#   - Anotações e marcações sobre capturas
+#   - Salvamento de screenshots
+#   - Cópia de imagens para a área de transferência
+#
+# =============================================================================
 cmd /c "C:\Print\gerar_exe.bat"
 
 """
 
+import base64
 import io
 import json
 import math
@@ -20,7 +36,11 @@ import threading
 import time
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import colorchooser, filedialog, messagebox
+import urllib.error
+import urllib.parse
+import urllib.request
+import webbrowser
+from tkinter import colorchooser, filedialog, messagebox, simpledialog
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageGrab, ImageTk
 
@@ -98,7 +118,7 @@ def caminho_config():
 
 def carregar_config():
     padrao = {"pasta": pasta_inicial(), "formato": "png", "cor": CORES[0], "largura": 4,
-              "ferramenta": "caneta", "recolhidos": []}
+              "ferramenta": "caneta", "recolhidos": [], "imgbb_chave": ""}
     try:
         with open(caminho_config(), encoding="utf-8") as f:
             dados = json.load(f)
@@ -118,6 +138,48 @@ def salvar_config():
             json.dump(CONFIG, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
+
+
+# ----------------------------------------------------------------------------
+# Upload para o ImgBB (link público de compartilhamento)
+# ----------------------------------------------------------------------------
+# Chave usada quando o usuário não definiu a sua nas Configurações.
+# Preencha antes de gerar o .exe para que ninguém precise criar uma conta.
+IMGBB_CHAVE_PADRAO = ""
+IMGBB_SITE_CHAVE = "https://api.imgbb.com/"
+
+
+def chave_imgbb():
+    return (CONFIG.get("imgbb_chave") or IMGBB_CHAVE_PADRAO or "").strip()
+
+
+def enviar_imgbb(dados, chave, nome):
+    """Envia a imagem (bytes) ao ImgBB e devolve o link direto público."""
+    corpo = urllib.parse.urlencode({
+        "image": base64.b64encode(dados).decode("ascii"),
+        "name": nome,
+    }).encode("ascii")
+    req = urllib.request.Request(
+        "https://api.imgbb.com/1/upload?key=" + urllib.parse.quote(chave),
+        data=corpo, headers={"User-Agent": "PrintaAi"})
+    try:
+        with urllib.request.urlopen(req, timeout=90) as r:
+            resp = json.load(r)
+    except urllib.error.HTTPError as ex:
+        try:
+            msg = json.load(ex).get("error", {}).get("message") or ""
+        except Exception:
+            msg = ""
+        if ex.code in (400, 401, 403) and "key" in msg.lower():
+            raise RuntimeError("Chave da API do ImgBB inválida. Confira em Configurações.")
+        raise RuntimeError(f"O ImgBB recusou o envio (HTTP {ex.code}). {msg}".strip())
+    except urllib.error.URLError as ex:
+        raise RuntimeError(f"Sem conexão com o ImgBB: {ex.reason}")
+    dados_resp = resp.get("data") or {}
+    link = dados_resp.get("url") or dados_resp.get("url_viewer")
+    if not link:
+        raise RuntimeError("Resposta inesperada do ImgBB.")
+    return link
 
 
 # ----------------------------------------------------------------------------
@@ -516,6 +578,8 @@ def icone_pil(nome, tam, cor):
         L((6, 6), (18, 18)); L((18, 6), (6, 18))
     elif nome == "minimizar":
         L((5, 12), (19, 12))
+    elif nome == "enviar":
+        L((12, 15), (12, 3.5)); L((7, 8.5), (12, 3.5), (17, 8.5)); L((3.5, 15), (3.5, 20.5), (20.5, 20.5), (20.5, 15))
     elif nome == "download":
         L((12, 3.5), (12, 15)); L((7, 10), (12, 15), (17, 10)); L((3.5, 15), (3.5, 20.5), (20.5, 20.5), (20.5, 15))
     elif nome == "engrenagem":
@@ -711,6 +775,7 @@ class Overlay(tk.Toplevel):
         self.popup_widgets = []
         self.campos = []
         self._popup_fechado = None
+        self.enviando = False
         self._aviso_id = None
         self.entry = self.entry_id = self.entry_info = None
         self.fechado = False
@@ -743,6 +808,8 @@ class Overlay(tk.Toplevel):
             self.bind(seq, lambda e: self.tecla_copiar())
         for seq in ("<Control-s>", "<Control-S>"):
             self.bind(seq, lambda e: self.salvar_como())
+        for seq in ("<Control-d>", "<Control-D>"):
+            self.bind(seq, lambda e: None if self.digitando() else self.enviar_link())
         for seq in ("<Control-z>", "<Control-Z>"):
             self.bind(seq, self.tecla_z)
         for seq in ("<Control-y>", "<Control-Y>"):
@@ -1220,7 +1287,7 @@ class Overlay(tk.Toplevel):
             h += sum(self._altura_card(k, k in rec) + 8 for k in SECOES)
         h += 2 + 40
         if not self.minimizado:
-            h += 8 + 38 + 8 + 32
+            h += 8 + 38 + 8 + 38 + 8 + 32
         return h + 12
 
     def mostrar_painel(self, reposicionar=False):
@@ -1330,6 +1397,10 @@ class Overlay(tk.Toplevel):
             y += 8
             ui.botao_rotulo(X(PAD), Y(y), px(IW), px(38), "Salvar como…", "download",
                             self.salvar_como, G, estilo="secundario")
+            y += 38 + 8
+            ui.botao_rotulo(X(PAD), Y(y), px(IW), px(38),
+                            "Enviando…" if self.enviando else "Enviar e copiar link", "enviar",
+                            self.enviar_link, G, estilo="secundario")
             y += 38 + 8
             self.ancoras["config"] = ui.botao(X(PAD), Y(y), px(IW), px(32),
                                               lambda: self.alternar_popup("config"), G,
@@ -1556,7 +1627,7 @@ class Overlay(tk.Toplevel):
     def _popup_config(self):
         ui, G = self.ui, "popup"
         P, W = px(14), px(280)
-        H = 2 * P + px(26 + 12 + 16 + 22 + 30 + 14 + 30) + (px(44) if WINDOWS else 0)
+        H = 2 * P + px(26 + 12 + 16 + 22 + 30 + 14 + 30 + 14 + 16 + 22 + 30) + (px(44) if WINDOWS else 0)
         x, y = self.posicao_popup(W, H, self.ancoras.get("config"))
         if y + H > self.ancoras.get("config", (0, 0, 0, y + H))[3]:
             y = max(self.mon_painel[1], self.ancoras.get("config", (0, 0, 0, y + H))[3] - H)
@@ -1592,6 +1663,26 @@ class Overlay(tk.Toplevel):
         ui.segmentos(x + W - P - px(116), yy, px(116), px(30),
                      [("PNG", fmt != "jpg", lambda: self.definir_formato("png")),
                       ("JPG", fmt == "jpg", lambda: self.definir_formato("jpg"))], G)
+        yy += px(30 + 14)
+
+        ui.tx(x + P, yy, "Chave da API do ImgBB (para links)", 11, T["texto2"], G, anchor="nw")
+        yy += px(16)
+        ch = CONFIG.get("imgbb_chave") or ""
+        if ch:
+            estado = "Definida (…" + ch[-4:] + ")"
+        elif IMGBB_CHAVE_PADRAO:
+            estado = "Usando a chave padrão"
+        else:
+            estado = "Não definida"
+        ui.tx(x + P, yy, estado, 12, T["texto"], G, anchor="nw")
+        yy += px(22)
+        ui.botao(x + P, yy, bw, px(30), self.definir_chave, G, r=px(7), fundo=T["btn"],
+                 hover=T["btn_hover"])
+        ui.tx(x + P + bw // 2, yy + px(15), "Definir chave…", 12, T["texto"], G)
+        ui.botao(x + P + bw + px(8), yy, bw, px(30),
+                 lambda: webbrowser.open(IMGBB_SITE_CHAVE), G, r=px(7),
+                 fundo=T["btn"], hover=T["btn_hover"])
+        ui.tx(x + P + bw + px(8) + bw // 2, yy + px(15), "Obter chave", 12, T["texto"], G)
         yy += px(30)
 
         if WINDOWS:
@@ -1620,6 +1711,25 @@ class Overlay(tk.Toplevel):
                 subprocess.Popen(["xdg-open" if sys.platform != "darwin" else "open", pasta])
         except Exception as ex:
             self.aviso(f"Não foi possível abrir a pasta: {ex}")
+
+    def pedir_chave(self):
+        chave = self.dialogo(
+            simpledialog.askstring, title="Chave da API do ImgBB",
+            prompt="Cole a sua chave da API do ImgBB.\n"
+                   f"Crie uma grátis em {IMGBB_SITE_CHAVE}\n"
+                   "(deixe em branco para remover)",
+            initialvalue=CONFIG.get("imgbb_chave") or "")
+        if chave is None:
+            return None
+        CONFIG["imgbb_chave"] = chave.strip()
+        salvar_config()
+        return CONFIG["imgbb_chave"]
+
+    def definir_chave(self):
+        self.fechar_popup()
+        self.pedir_chave()
+        if not self.fechado:
+            self.abrir_popup("config")
 
     def definir_formato(self, fmt):
         CONFIG["formato"] = fmt
@@ -1658,6 +1768,69 @@ class Overlay(tk.Toplevel):
             self.dialogo(messagebox.showerror, title="Erro ao copiar", message=str(ex))
             return
         self.fechar("Copiado para a área de transferência — é só colar (Ctrl+V).")
+
+    def enviar_link(self):
+        """Envia ao ImgBB e copia o link público para a área de transferência."""
+        if not self.editando or self.enviando:
+            return
+        self.confirmar_texto()
+        self.fechar_popup()
+        chave = chave_imgbb()
+        if not chave:
+            if self.dialogo(messagebox.askyesno, title="Chave do ImgBB",
+                            message="Para gerar links é preciso uma chave (grátis) da API do "
+                                    "ImgBB.\n\nAbrir o site para criar a chave agora?"):
+                webbrowser.open(IMGBB_SITE_CHAVE)
+            chave = (self.pedir_chave() or "").strip()
+            if not chave:
+                return
+        jpg = CONFIG.get("formato") == "jpg"
+        try:
+            buf = io.BytesIO()
+            img = self.renderizar()
+            if jpg:
+                img.convert("RGB").save(buf, "JPEG", quality=92)
+            else:
+                img.save(buf, "PNG")
+        except Exception as ex:
+            self.dialogo(messagebox.showerror, title="Erro ao enviar", message=str(ex))
+            return
+        nome = time.strftime("captura_%Y%m%d_%H%M%S")
+        resultado = {}
+
+        def trabalho():
+            try:
+                resultado["link"] = enviar_imgbb(buf.getvalue(), chave, nome)
+            except Exception as ex:
+                resultado["erro"] = str(ex)
+
+        self.enviando = True
+        self.atualizar_painel()
+        self.aviso("Enviando imagem para o ImgBB…", ms=120000)
+        threading.Thread(target=trabalho, daemon=True).start()
+        self.after(150, self._aguardar_envio, resultado)
+
+    def _aguardar_envio(self, resultado):
+        if not resultado:
+            if not self.fechado:
+                self.after(150, self._aguardar_envio, resultado)
+            return
+        self.enviando = False
+        if self.fechado:  # o usuário fechou a captura durante o envio
+            return
+        if "erro" in resultado:
+            self._fim_aviso()
+            self.atualizar_painel()
+            self.dialogo(messagebox.showerror, title="Erro ao enviar", message=resultado["erro"])
+            return
+        link = resultado["link"]
+        try:
+            self.master.clipboard_clear()
+            self.master.clipboard_append(link)
+            self.master.update()
+        except tk.TclError:
+            pass
+        self.fechar(f"Link copiado: {link}")
 
     @staticmethod
     def _gravar(img, caminho):
@@ -1806,7 +1979,7 @@ CHAVE_RUN = r"Software\Microsoft\Windows\CurrentVersion\Run"
 # --- instalação (usado pelo instalador e pelo "--desinstalar") -----------------
 NOME_APP = "PrintaAí"
 EXE_APP = "PrintaAi.exe"
-VERSAO_APP = "1.0.2"
+VERSAO_APP = "1.2.1"
 AUTOR = "Marcos Barros"
 CHAVE_DESINSTALAR = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\PrintaAi"
 
@@ -2356,7 +2529,7 @@ class App:
         if msg:
             self.txt_ultima = f"{time.strftime('%H:%M:%S')} — {msg}"
             self.desenhar_janela()
-            if self.bandeja and self.volta != "normal" and msg.startswith("Salvo"):
+            if self.bandeja and self.volta != "normal" and msg.startswith(("Salvo", "Link")):
                 self.bandeja.notificar("PrintaAí", msg)
         self.restaurar()
 

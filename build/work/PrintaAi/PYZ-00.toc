@@ -426,6 +426,7 @@
   ('urllib.parse', 'C:\\Python\\Lib\\urllib\\parse.py', 'PYMODULE'),
   ('urllib.request', 'C:\\Python\\Lib\\urllib\\request.py', 'PYMODULE'),
   ('urllib.response', 'C:\\Python\\Lib\\urllib\\response.py', 'PYMODULE'),
+  ('webbrowser', 'C:\\Python\\Lib\\webbrowser.py', 'PYMODULE'),
   ('xml', 'C:\\Python\\Lib\\xml\\__init__.py', 'PYMODULE'),
   ('xml.etree', 'C:\\Python\\Lib\\xml\\etree\\__init__.py', 'PYMODULE'),
   ('xml.etree.ElementInclude',
