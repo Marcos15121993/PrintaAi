@@ -8,7 +8,7 @@ r"""
 #
 # DESENVOLVEDOR: Marcos Barros
 # LINGUAGEM:     Python
-# VERSÃO:        1.2.1
+# VERSÃO:        1.2.3
 # DATA:          10/11/2026
 #
 # FUNCIONALIDADES:
@@ -1979,7 +1979,7 @@ CHAVE_RUN = r"Software\Microsoft\Windows\CurrentVersion\Run"
 # --- instalação (usado pelo instalador e pelo "--desinstalar") -----------------
 NOME_APP = "PrintaAí"
 EXE_APP = "PrintaAi.exe"
-VERSAO_APP = "1.2.1"
+VERSAO_APP = "1.2.3"
 AUTOR = "Marcos Barros"
 CHAVE_DESINSTALAR = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\PrintaAi"
 
